@@ -64,16 +64,20 @@ resource "google_bigquery_dataset" "staging" {
   dataset_id = "staging"
   location   = var.region
   labels     = { layer = "staging" }
+  delete_contents_on_destroy = true
+
 }
 
 resource "google_bigquery_dataset" "intermediate" {
   dataset_id = "intermediate"
   location   = var.region
   labels     = { layer = "intermediate" }
+  delete_contents_on_destroy = true
 }
 
 resource "google_bigquery_dataset" "marts" {
   dataset_id = "marts"
   location   = var.region
   labels     = { layer = "marts" }
+  delete_contents_on_destroy = true
 }
