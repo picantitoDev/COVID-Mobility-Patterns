@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: fct_transactions
+    description: "Tabla de hechos de ventas. Granularidad: 1 fila por producto dentro de un ticket de compra."
+    columns:
+      - name: basket_id
+        tests:
+          - not_null
+      - name: product_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_product')
+              field: product_id
+      - name: transaction_date
+        description: "Fecha generada dinámicamente para particionamiento en BigQuery."
+
+  - name: fct_coupon_redemptions
+    description: "Tabla de hechos de redención de cupones. Granularidad: 1 fila por cupón redimido."
+    columns:
+      - name: campaign_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_campaign')
+              field: campaign_id
+
+  - name: dim_household
+    description: "Dimensión de hogares y perfil demográfico."
+    columns:
+      - name: household_id
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_date
+    description: "Dimensión calendario para habilitar BI temporal."
+    columns:
+      - name: calendar_date
+        tests:
+          - unique
+          - not_null

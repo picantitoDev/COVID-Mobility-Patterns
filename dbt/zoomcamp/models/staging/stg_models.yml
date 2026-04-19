@@ -1,0 +1,61 @@
+version: 2
+
+models:
+  - name: stg_hh_demographic
+    description: "Información sociodemográfica a nivel de hogar."
+    columns:
+      - name: household_id
+        description: "Identificador único de cada hogar."
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_product
+    description: "Maestro de productos del catálogo."
+    columns:
+      - name: product_id
+        description: "Identificador único de producto."
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_campaign_desc
+    description: "Maestro de campañas y sus periodos."
+    columns:
+      - name: campaign_id
+        description: "Identificador único de la campaña."
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_transaction_data
+    description: "Detalle transaccional de compras a nivel línea de ticket."
+    columns:
+      - name: household_id
+        tests:
+          - not_null
+      - name: basket_id
+        tests:
+          - not_null
+      - name: product_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_product')
+              field: product_id
+              
+  - name: stg_coupon
+    description: "Mapeo de cupones a campañas y productos válidos."
+    columns:
+      - name: campaign_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_campaign_desc')
+              field: campaign_id
+      - name: product_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_product')
+              field: product_id

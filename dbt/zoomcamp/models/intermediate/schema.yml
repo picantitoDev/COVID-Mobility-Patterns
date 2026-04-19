@@ -1,0 +1,68 @@
+version: 2
+
+models:
+  - name: int_transactions_enriched
+    description: "El motor financiero: Transacciones a nivel de línea de ticket, enriquecidas con metadata de producto y descuentos consolidados."
+    columns:
+      - name: basket_id
+        description: "Identificador de la transacción/ticket."
+        tests:
+          - not_null
+      - name: product_id
+        tests:
+          - not_null
+      - name: total_discount_amount
+        description: "Suma absoluta de los descuentos aplicados (retailer, fabricante y lealtad)."
+
+  - name: int_promotions_enriched
+    description: "El motor de punto de venta: Transacciones cruzadas con datos causales para identificar si la venta fue impulsada por exhibiciones o folletos."
+    columns:
+      - name: is_on_display
+        description: "Booleano (True/False): Indica si el producto estaba exhibido en un lugar especial de la tienda durante esa semana."
+      - name: is_in_mailer
+        description: "Booleano (True/False): Indica si el producto estaba anunciado en el folleto promocional esa semana."
+
+  - name: int_campaign_redemptions_joined
+    description: "El motor de conversión: Historial de redención de cupones cruzado con la metadata de la campaña para validar fechas."
+    columns:
+      - name: is_redeemed_in_window
+        description: "Booleano (True/False): Valida si la redención del cupón ocurrió durante las fechas oficiales de inicio y fin de la campaña."
+
+  - name: int_customer_behavior_aggregated
+    description: "El motor de lealtad: Métricas de comportamiento de compra pre-agregadas por hogar, enriquecidas con datos sociodemográficos."
+    columns:
+      - name: household_id
+        description: "Identificador único de la familia/hogar."
+        tests:
+          - unique
+          - not_null
+      - name: avg_basket_value
+        description: "Ticket promedio calculado (Total gastado / Número de transacciones)."
+      - name: total_items_bought
+        description: "Volumen total de artículos comprados a lo largo de toda la historia del cliente."
+
+  - name: int_household_campaign_exposure
+    description: "El motor de alcance: Mapeo de hogares (y su demografía) con las campañas de marketing que recibieron y sus fechas de vigencia."
+    columns:
+      - name: household_id
+        tests:
+          - not_null
+      - name: campaign_id
+        tests:
+          - not_null
+      - name: campaign_type
+        description: "Tipo de campaña asignada (TypeA, TypeB, TypeC)."
+
+  - name: int_product_coupon_eligibility
+    description: "El motor de catálogo: Maestro de elegibilidad que cruza cupones, productos válidos y campañas."
+    columns:
+      - name: coupon_upc
+        description: "Identificador universal del código de barras del cupón."
+        tests:
+          - not_null
+      - name: product_id
+        description: "Producto en el que se puede aplicar el cupón."
+        tests:
+          - not_null
+      - name: department_name
+        description: "Departamento al que pertenece el producto en promoción (ej. GROCERY, MEAT)."

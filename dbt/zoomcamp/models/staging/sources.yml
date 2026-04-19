@@ -1,0 +1,23 @@
+version: 2
+
+sources:
+  - name: dunnhumby
+    schema: staging
+    description: "Dataset The Complete Journey de dunnhumby"
+    tables:
+      - name: campaign_table
+        identifier: ext_campaign_table # <--- Conectando con tu tabla externa real
+      - name: hh_demographic
+        identifier: ext_hh_demographic
+      - name: transaction_data
+        identifier: ext_transaction_data
+      - name: campaign_desc
+        identifier: ext_campaign_desc
+      - name: coupon_redempt
+        identifier: ext_coupon_redempt
+      - name: coupon
+        identifier: ext_coupon
+      - name: product
+        identifier: ext_product
+      - name: causal_data
+        identifier: ext_causal_data

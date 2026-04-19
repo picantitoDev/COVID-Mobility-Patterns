@@ -21,3 +21,9 @@ data/
 *.tfstate.*
 *.tfvars
 *.tfvars.json
+
+# dbt
+dbt/logs/
+dbt/zoomcamp/target/
+dbt/zoomcamp/logs/
+dbt/zoomcamp/dbt_packages/
