@@ -10,6 +10,6 @@ variable "region" {
 }
 
 variable "gcs_bucket" {
-  description = "Nombre del bucket para el Data Lake"
+  description = "Bucket Name for the Data Lake"
   type        = string
 }

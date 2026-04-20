@@ -1,6 +1,4 @@
-# -------------------
-# APIs NECESARIAS
-# -------------------
+# Enabling APIs
 resource "google_project_service" "services" {
   for_each = toset([
     "bigquery.googleapis.com",
@@ -13,19 +11,16 @@ resource "google_project_service" "services" {
   disable_on_destroy = false
 }
 
-# -------------------
-# SERVICE ACCOUNT
-# -------------------
+# IAM and Service Accounts
 resource "google_service_account" "pipeline_sa" {
   account_id   = "dunnhumby-pipeline-sa"
   display_name = "Dunnhumby Retail Pipeline Service Account"
 }
 
-# Roles para BigQuery y Storage
 resource "google_project_iam_member" "pipeline_roles" {
   for_each = toset([
-    "roles/bigquery.admin",        # Para que dbt cree tablas y vistas
-    "roles/storage.objectAdmin"    # Para lectura/escritura en el Data Lake
+    "roles/bigquery.admin",
+    "roles/storage.objectAdmin"
   ])
   project = var.project_id
   role    = each.key
@@ -41,9 +36,7 @@ resource "local_file" "sa_key_file" {
   filename = "${path.module}/../keys/google-creds.json"
 }
 
-# -------------------
-# GCS (DATA LAKE)
-# -------------------
+# GCS Data Lake
 resource "google_storage_bucket" "lake" {
   name          = var.gcs_bucket
   location      = var.region
@@ -56,10 +49,7 @@ resource "google_storage_bucket" "lake" {
   }
 }
 
-# -------------------
-# BIGQUERY DATASETS (Capas de dbt)
-# -------------------
-
+# BigQuery Datasets (Warehouse)
 resource "google_bigquery_dataset" "staging" {
   dataset_id = "staging"
   location   = var.region
