@@ -21,7 +21,7 @@
 ## 🎯 Problem Description
 
 ### The Context: "The Complete Journey"
-In the grocery retail sector, understanding customer behavior is the key to survival. To explore this, dunnhumby released **"The Complete Journey"** dataset—a comprehensive record of household-level transactions over two years from a group of frequent shoppers. Unlike typical datasets that sample only specific categories, this tracks *every single purchase* a household makes, alongside their demographic profiles and direct marketing contact history. 
+In the grocery retail sector, understanding customer behavior is the key to survival. To explore this, dunnhumby released **"The Complete Journey"** dataset—a comprehensive record of household-level transactions over two years (Jan 2022 - Dec 2023) from a group of frequent shoppers. Unlike typical datasets that sample only specific categories, this tracks *every single purchase* a household makes, alongside their demographic profiles and direct marketing contact history. 
 
 ### The Engineering Challenge
 Extracting value from this dataset presents a significant data engineering bottleneck. In its raw form, the data is fragmented across complex, highly relational, and siloed CSV files. Querying this raw web of transactions, coupons, and campaigns directly is slow, expensive, and lacks enforced data quality rules.
@@ -661,6 +661,7 @@ errors:
 
 </details>
 
+---
 ## 📈 Dashboard & Insights
 
 The final layer of the pipeline is a Looker Studio dashboard connected directly to the BigQuery marts dataset.  
