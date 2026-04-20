@@ -1,4 +1,4 @@
-id: ingest_dunnhumby_retail
+id: data_sources_ingestion
 namespace: zoomcamp
 
 description: Download the Dunnhumby dataset and upload raw CSV files to GCS

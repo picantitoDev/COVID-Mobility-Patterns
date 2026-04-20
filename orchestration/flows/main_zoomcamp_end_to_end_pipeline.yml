@@ -1,4 +1,4 @@
-id: master_pipeline_orchestrator
+id: end_to_end_pipeline
 namespace: zoomcamp
 description: Central orchestration workflow for the Dunnhumby Retail pipeline. Executes ingestion, Spark processing, external table creation, and dbt transformations.
 
@@ -9,17 +9,17 @@ triggers:
     disabled: false
 
 tasks:
-  - id: bootstrap_runtime_config
+  - id: bootstrap_configuration
     type: io.kestra.plugin.core.flow.Subflow
     namespace: zoomcamp
-    flowId: gcp_kv
+    flowId: init_gcp_kv
     wait: true
     transmitFailed: true
 
-  - id: ingest_raw_data
+  - id: data_ingestion
     type: io.kestra.plugin.core.flow.Subflow
     namespace: zoomcamp
-    flowId: ingest_dunnhumby_retail
+    flowId: data_sources_ingestion
     wait: true
     transmitFailed: true
     retry:
@@ -27,10 +27,10 @@ tasks:
       interval: PT2M
       maxAttempt: 3
 
-  - id: process_silver_layer
+  - id: distributed_cleansing
     type: io.kestra.plugin.core.flow.Subflow
     namespace: zoomcamp
-    flowId: spark_test
+    flowId: distributed_data_cleansing
     wait: true
     transmitFailed: true
     retry:
@@ -38,17 +38,17 @@ tasks:
       interval: PT5M
       maxAttempt: 2
 
-  - id: create_bigquery_external_tables
+  - id: schema_mapping
     type: io.kestra.plugin.core.flow.Subflow
     namespace: zoomcamp
-    flowId: silver_to_bq
+    flowId: warehouse_schema_mapping
     wait: true
     transmitFailed: true
 
-  - id: build_dbt_models
+  - id: analytical_modeling
     type: io.kestra.plugin.core.flow.Subflow
     namespace: zoomcamp
-    flowId: dbt_bq
+    flowId: analytical_model_transformation
     wait: true
     transmitFailed: true
     retry:

@@ -1,4 +1,4 @@
-id: gcp_kv
+id: init_gcp_kv
 namespace: zoomcamp
 description: Initialize Google Cloud configuration values in Kestra key-value storage using global variables.
 
