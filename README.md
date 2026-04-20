@@ -11,12 +11,10 @@
 2. [The Dataset](#-the-dataset)
 3. [Architecture Overview](#-architecture-overview)
 4. [Technology Stack](#-technology-stack)
-5. [Data Ingestion](#-data-ingestion)
-6. [Data Lake (Storage)](#-data-lake)
-7. [Data Warehouse (Modeling)](#-data-warehouse)
-8. [Transformations (dbt)](#-transformations)
-9. [Dashboard & Insights](#-dashboard--insights)
-10. [Reproducibility](#-reproducibility)
+5. [Reproducibility](#-reproducibility)
+6. [Storage and Modeling Results](#-storage-and-modeling-results)
+7. [Orchestration Flows (Kestra)](#-orchestration-flows-kestra)
+8. [Dashboard & Insights](#-dashboard--insights)
 
 ---
 
@@ -52,7 +50,7 @@ The pipeline processes the **"Dunnhumby - The Complete Journey"** dataset, autom
 ### Core Data Entities
 The raw data is contained in several key files that our pipeline unifies to build the analytical platform:
 
-* **🛒 Transactions (`transaction_data`):** Records every item scanned at the register, prices, and discounts[cite: 39, 45, 46].
+* **🛒 Transactions (`transaction_data`):** Records every item scanned at the register, prices, and discounts.
 * **👥 Customer Profiles (`hh_demographic`):** Demographic data for households, including income, marital status, and household size.
 * **🎯 Marketing & Coupons (`campaign_table`, `campaign_desc`, `coupon`, `coupon_redempt`):** Details of 30 marketing campaigns and the specific coupons households received and redeemed.
 * **📦 Product Metadata (`product`, `causal_data`):** The store catalog and in-store features like weekly mailers or special displays.
@@ -262,11 +260,413 @@ Subsequently, dbt was used to orchestrate the modeling process within BigQuery, 
 
 ![BigQuery dbt Models](docs/images/transformed_datasets.png)
 
+## 🧩 Orchestration Flows (Kestra)
+
+To ensure modularity, fault tolerance, and easy debugging, the pipeline is divided into specialized Kestra flows. By avoiding a monolithic script, we can retry specific tasks (like ingestion) without re-running expensive compute jobs (like Spark).
+
+---
+
+### Flow Overview
+
+| # | Flow ID | Purpose |
+| :---: | :--- | :--- |
+| 1 | `init_gcp_kv` | Loads environment variables into Kestra's KV store |
+| 2 | `data_sources_ingestion` | Downloads dataset from Kaggle and uploads CSVs to GCS Bronze layer |
+| 3 | `distributed_data_cleansing` | Runs PySpark to clean data and write Parquet to GCS Silver layer |
+| 4 | `warehouse_schema_mapping` | Creates BigQuery external tables from Silver Parquet files |
+| 5 | `analytical_model_transformation` | Runs `dbt build` to execute all staging, intermediate, and mart models |
+| 6 | `end_to_end_pipeline` | Master orchestrator that chains all subflows with retry logic |
+
+---
+
+### 1. Configuration Bootstrap (`init_gcp_kv`)
+
+Securely loads environment variables (Project ID, Locations, Buckets) into Kestra's internal Key-Value (KV) store. This ensures all subsequent flows are completely dynamic and parameterized.
+
+<details>
+<summary><b>View Source Code (YAML)</b></summary>
+
+```yaml
+id: init_gcp_kv
+namespace: zoomcamp
+description: Initialize Google Cloud configuration values in Kestra key-value storage using global variables.
+
+tasks:
+  - id: gcp_project_id
+    type: io.kestra.plugin.core.kv.Set
+    key: GCP_PROJECT_ID
+    kvType: STRING
+    value: "{{ envs.gcp_project_id }}"
+
+  - id: gcp_location
+    type: io.kestra.plugin.core.kv.Set
+    key: GCP_LOCATION
+    kvType: STRING
+    value: "{{ envs.gcp_location }}"
+
+  - id: gcp_bucket_name
+    type: io.kestra.plugin.core.kv.Set
+    key: GCP_BUCKET_NAME
+    kvType: STRING
+    value: "{{ envs.gcp_bucket_name }}"
+
+  - id: gcp_dataset_staging
+    type: io.kestra.plugin.core.kv.Set
+    key: GCP_DATASET_STAGING
+    kvType: STRING
+    value: "{{ envs.gcp_dataset_staging }}"
+
+  - id: gcp_dataset_intermediate
+    type: io.kestra.plugin.core.kv.Set
+    key: GCP_DATASET_INTERMEDIATE
+    kvType: STRING
+    value: "{{ envs.gcp_dataset_intermediate }}"
+
+  - id: gcp_dataset_marts
+    type: io.kestra.plugin.core.kv.Set
+    key: GCP_DATASET_MARTS
+    kvType: STRING
+    value: "{{ envs.gcp_dataset_marts }}"
+```
+
+</details>
+
+---
+
+### 2. Data Ingestion (`data_sources_ingestion`)
+
+Authenticates with the Kaggle API, downloads the `dunnhumby.zip` file, unzips it within a container, and concurrently uploads the raw `.csv` files directly to the GCS `bronze/` layer using a `ForEach` loop.
+
+<details>
+<summary><b>View Source Code (YAML)</b></summary>
+
+```yaml
+id: data_sources_ingestion
+namespace: zoomcamp
+description: Download the Dunnhumby dataset and upload raw CSV files to GCS
+
+variables:
+  bucket: "{{ kv('GCP_BUCKET_NAME') }}"
+  tables:
+    - campaign_desc
+    - campaign_table
+    - causal_data
+    - coupon
+    - coupon_redempt
+    - hh_demographic
+    - product
+    - transaction_data
+
+tasks:
+  - id: extract
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    containerImage: python:3.11-slim
+    outputFiles:
+      - "*.csv"
+    commands:
+      - |
+        echo "--- Installing dependencies ---"
+        apt-get update
+        apt-get install -y wget unzip
+
+        echo "--- Downloading dataset ---"
+        wget -O dunnhumby.zip \
+          https://www.kaggle.com/api/v1/datasets/download/frtgnn/dunnhumby-the-complete-journey
+
+        echo "--- Extracting files ---"
+        unzip dunnhumby.zip
+
+        echo "--- Listing extracted files ---"
+        ls -lah
+
+  - id: upload_to_gcs
+    type: io.kestra.plugin.core.flow.ForEach
+    values: "{{ vars.tables }}"
+    tasks:
+      - id: upload
+        type: io.kestra.plugin.gcp.gcs.Upload
+        from: "{{ outputs.extract.outputFiles[taskrun.value ~ '.csv'] }}"
+        to: "gs://{{ vars.bucket }}/bronze/{{ taskrun.value }}.csv"
+
+pluginDefaults:
+  - type: io.kestra.plugin.gcp
+    values:
+      serviceAccount: "{{ secret('GCP_SERVICE_ACCOUNT') }}"
+      projectId: "{{ kv('GCP_PROJECT_ID') }}"
+      location: "{{ kv('GCP_LOCATION') }}"
+```
+
+</details>
+
+---
+
+### 3. Data Lake Processing (`distributed_data_cleansing`)
+
+Spins up a PySpark environment, reads the raw CSVs from the Bronze layer, enforces schema inference, drops nulls and duplicates, and writes compressed Parquet files to the `silver/` layer.
+
+<details>
+<summary><b>View Source Code (YAML)</b></summary>
+
+```yaml
+id: distributed_data_cleansing
+namespace: zoomcamp
+description: Process raw CSV files from Google Cloud Storage with Spark and write cleaned Parquet files to the silver layer.
+
+tasks:
+  - id: run_spark_silver
+    type: io.kestra.plugin.scripts.python.Script
+    containerImage: python:3.11-slim
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      user: "root"
+      memory:
+        memory: "8GB"
+        memoryReservation: "6GB"
+        memorySwap: "8GB"
+    env:
+      GCP_BUCKET: "{{ kv('GCP_BUCKET_NAME') }}"
+      JAVA_HOME: /usr/lib/jvm/default-java
+      GOOGLE_APPLICATION_CREDENTIALS: "gcp-key.json"
+    inputFiles:
+      gcp-key.json: "{{ secret('GCP_SERVICE_ACCOUNT') }}"
+    beforeCommands:
+      - apt-get update
+      - apt-get install -y default-jdk
+      - pip install pyspark google-cloud-storage
+    script: |
+      import os
+      import sys
+      from pyspark.sql import SparkSession
+
+      key_path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
+      bucket = os.environ["GCP_BUCKET"]
+
+      tables = [
+          "campaign_desc", "campaign_table", "causal_data",
+          "coupon", "coupon_redempt", "hh_demographic",
+          "product", "transaction_data"
+      ]
+
+      spark = (
+          SparkSession.builder
+          .appName("Dunnhumby-Silver-Processing")
+          .config("spark.jars.packages", "com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.15")
+          .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
+          .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
+          .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
+          .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", key_path)
+          .config("spark.driver.memory", "6g")
+          .config("spark.executor.memory", "6g")
+          .config("spark.sql.shuffle.partitions", "4")
+          .getOrCreate()
+      )
+
+      failed_tables = []
+
+      for table in tables:
+          try:
+              print(f"--- Processing table: {table} ---")
+              df = spark.read.option("header", "true").option("inferSchema", "true").csv(f"gs://{bucket}/bronze/{table}.csv")
+              df_clean = df.dropna(how="all").dropDuplicates()
+              df_clean.write.mode("overwrite").parquet(f"gs://{bucket}/silver/{table}")
+              spark.catalog.clearCache()
+          except Exception as e:
+              print(f"Failed table {table}: {str(e)}")
+              failed_tables.append(table)
+
+      spark.stop()
+
+      if failed_tables:
+          raise RuntimeError(f"Processing failed for tables: {', '.join(failed_tables)}")
+```
+
+</details>
+
+---
+
+### 4. Data Warehouse Bridge (`warehouse_schema_mapping`)
+
+Acts as the bridge between the Data Lake and the Data Warehouse. It uses a Jinja loop to execute `CREATE OR REPLACE EXTERNAL TABLE` queries in BigQuery, directly referencing the Silver Parquet files in GCS without duplicating storage costs.
+
+<details>
+<summary><b>View Source Code (YAML)</b></summary>
+
+```yaml
+id: warehouse_schema_mapping
+namespace: zoomcamp
+description: Create or replace BigQuery external tables from Parquet files stored in the silver layer in Google Cloud Storage.
+
+tasks:
+  - id: create_bigquery_external_tables
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ secret('GCP_SERVICE_ACCOUNT') }}"
+    sql: |
+      {% set tables = [
+        "campaign_desc", "campaign_table", "causal_data",
+        "coupon", "coupon_redempt", "hh_demographic",
+        "product", "transaction_data"
+      ] %}
+
+      {% for table in tables %}
+      CREATE OR REPLACE EXTERNAL TABLE
+      `{{ kv('GCP_PROJECT_ID') }}.{{ kv('GCP_DATASET_STAGING') }}.ext_{{ table }}`
+      OPTIONS (
+        format = 'PARQUET',
+        uris = ['gs://{{ kv('GCP_BUCKET_NAME') }}/silver/{{ table }}/*.parquet']
+      );
+      {% endfor %}
+```
+
+</details>
+
+---
+
+### 5. Analytical Modeling (`analytical_model_transformation`)
+
+Executes the ELT transformations by spinning up a `dbt-bigquery` container, dynamically generating `profiles.yml` using Kestra's KV store, and running `dbt build` to execute all staging, intermediate, and marts models.
+
+<details>
+<summary><b>View Source Code (YAML)</b></summary>
+
+```yaml
+id: analytical_model_transformation
+namespace: zoomcamp
+description: Clone the repository and build the data warehouse with dbt in BigQuery.
+
+tasks:
+  - id: execute_dbt_models
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+    containerImage: ghcr.io/dbt-labs/dbt-bigquery:1.9.0
+    inputFiles:
+      gcp-key.json: "{{ secret('GCP_SERVICE_ACCOUNT') }}"
+    commands:
+      - |
+        echo "--- Cloning repository ---"
+        rm -rf repo
+        git clone https://github.com/picantitoDev/COVID-Mobility-Patterns.git repo
+
+        cd repo/dbt/zoomcamp
+
+        echo "--- Creating dbt profile ---"
+        mkdir -p ~/.dbt
+
+        cat <<EOF > ~/.dbt/profiles.yml
+        zoomcamp:
+          outputs:
+            dev:
+              type: bigquery
+              method: service-account
+              project: {{ kv('GCP_PROJECT_ID') }}
+              dataset: {{ kv('GCP_DATASET_STAGING') }}
+              threads: 4
+              keyfile: "{{ workingDir }}/gcp-key.json"
+              location: {{ kv('GCP_LOCATION') }}
+              priority: interactive
+          target: dev
+        EOF
+
+        echo "--- Installing dependencies ---"
+        dbt deps
+
+        echo "--- Testing BigQuery connection ---"
+        dbt debug
+
+        echo "--- Building data warehouse ---"
+        dbt build --target dev
+```
+
+</details>
+
+---
+
+### 6. Master Orchestrator (`end_to_end_pipeline`)
+
+The parent flow that strings all subflows together with strict `wait: true` dependencies. It includes a daily cron schedule (`0 5 * * *`), retry blocks for API and network resilience, and a failure alert catcher.
+
+<details>
+<summary><b>View Source Code (YAML)</b></summary>
+
+```yaml
+id: end_to_end_pipeline
+namespace: zoomcamp
+description: Central orchestration workflow for the Dunnhumby Retail pipeline. Executes ingestion, Spark processing, external table creation, and dbt transformations.
+
+triggers:
+  - id: daily_pipeline_schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 5 * * *"
+    disabled: false
+
+tasks:
+  - id: bootstrap_configuration
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: zoomcamp
+    flowId: init_gcp_kv
+    wait: true
+    transmitFailed: true
+
+  - id: data_ingestion
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: zoomcamp
+    flowId: data_sources_ingestion
+    wait: true
+    transmitFailed: true
+    retry:
+      type: constant
+      interval: PT2M
+      maxAttempt: 3
+
+  - id: distributed_cleansing
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: zoomcamp
+    flowId: distributed_data_cleansing
+    wait: true
+    transmitFailed: true
+    retry:
+      type: constant
+      interval: PT5M
+      maxAttempt: 2
+
+  - id: schema_mapping
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: zoomcamp
+    flowId: warehouse_schema_mapping
+    wait: true
+    transmitFailed: true
+
+  - id: analytical_modeling
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: zoomcamp
+    flowId: analytical_model_transformation
+    wait: true
+    transmitFailed: true
+    retry:
+      type: constant
+      interval: PT1M
+      maxAttempt: 2
+
+errors:
+  - id: alert_on_failure
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    commands:
+      - echo "Pipeline failed at the exec {{ execution.id }}."
+```
+
+</details>
+
 ## 📈 Dashboard & Insights
 
 The final layer of the pipeline is a Looker Studio dashboard connected directly to the BigQuery marts dataset.  
 The visual layer was specifically designed to answer the core business questions established at the beginning of the project.
 
+#### 👉 [View the Live Dashboard](https://datastudio.google.com/reporting/34c1f096-a007-479d-a6f7-1dce234a04d8)
 ---
 
 ### 1. Spending Trends
