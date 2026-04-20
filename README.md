@@ -10,11 +10,13 @@
 1. [Problem Description](#-problem-description)
 2. [The Dataset](#-the-dataset)
 3. [Architecture Overview](#-architecture-overview)
-4. [Technology Stack](#-technology-stack)
-5. [Reproducibility](#-reproducibility)
-6. [Storage and Modeling Results](#-storage-and-modeling-results)
-7. [Orchestration Flows (Kestra)](#-orchestration-flows-kestra)
-8. [Dashboard & Insights](#-dashboard--insights)
+4. [Project Structure](#-project-structure)
+5. [Technology Stack](#-technology-stack)
+6. [Reproducibility](#-reproducibility)
+7. [Storage and Modeling Results](#-storage-and-modeling-results)
+8. [Orchestration Flows (Kestra)](#-orchestration-flows-kestra)
+9. [Transformation & Optimization (dbt)](#-transformation--optimization-dbt)
+10. [Dashboard & Insights](#-dashboard--insights)
 
 ---
 
@@ -94,6 +96,71 @@ The pipeline follows a modern **ELT (Extract, Load, Transform)** pattern, fully 
 │  Consumer Behavior Dashboard                                │
 └─────────────────────────────────────────────────────────────┘
 ```
+## 📁 Project Structure
+
+```text
+dunnhumby-retail-pipeline/
+├── dbt/
+│   └── zoomcamp/                        # dbt project root
+│       ├── dbt_project.yml
+│       ├── macros/                      # Reusable SQL macros
+│       │   ├── calculate_total_discount.sql
+│       │   ├── generate_schema_name.sql
+│       │   ├── get_promotion_flag.sql
+│       │   └── safe_divide.sql
+│       └── models/
+│           ├── staging/                 # Raw source cleaning layer
+│           │   ├── sources.yml
+│           │   ├── stg_models.yml
+│           │   ├── stg_campaign_desc.sql
+│           │   ├── stg_campaign_table.sql
+│           │   ├── stg_causal_data.sql
+│           │   ├── stg_coupon.sql
+│           │   ├── stg_coupon_redempt.sql
+│           │   ├── stg_hh_demographic.sql
+│           │   ├── stg_product.sql
+│           │   └── stg_transaction_data.sql
+│           ├── intermediate/            # Business logic & joins
+│           │   ├── schema.yml
+│           │   ├── int_campaign_redemptions_joined.sql
+│           │   ├── int_customer_behavior_aggregated.sql
+│           │   ├── int_household_campaign_exposure.sql
+│           │   ├── int_product_coupon_eligibility.sql
+│           │   ├── int_promotions_enriched.sql
+│           │   └── int_transactions_enriched.sql
+│           └── marts/                   # Analytical star schema
+│               ├── schema.yml
+│               ├── dim_campaign.sql
+│               ├── dim_date.sql
+│               ├── dim_household.sql
+│               ├── dim_product.sql
+│               ├── fct_coupon_redemptions.sql
+│               ├── fct_customer_metrics.sql
+│               └── fct_transactions.sql
+├── docs/
+│   └── images/                          # README screenshots
+├── keys/                                # GCP credentials (git-ignored)
+├── orchestration/
+│   ├── docker-compose.yml               # Kestra + Postgres setup
+│   └── flows/                           # Kestra flow definitions
+│       ├── main_zoomcamp_init_gcp_kv.yml
+│       ├── main_zoomcamp_data_sources_ingestion.yml
+│       ├── main_zoomcamp_distributed_data_cleansing.yml
+│       ├── main_zoomcamp_warehouse_schema_mapping.yml
+│       ├── main_zoomcamp_analytical_model_transformation.yml
+│       └── main_zoomcamp_end_to_end_pipeline.yml
+├── terraform/                           # Infrastructure as Code
+│   ├── main.tf
+│   ├── variables.tf
+│   ├── outputs.tf
+│   ├── providers.tf
+│   ├── versions.tf
+│   └── terraform.tfvars.example
+├── pyproject.toml
+├── uv.lock
+└── README.md
+```
+
 ## 🛠️ Technology Stack
 
 | Layer | Technology |
@@ -662,6 +729,24 @@ errors:
 </details>
 
 ---
+
+## 💎 Transformation & Optimization (dbt)
+
+The transformation layer goes beyond simple data joining — it is explicitly designed to minimize BigQuery scan costs and maximize query performance for the Looker Studio dashboard, leveraging dbt's configuration blocks to enforce **Partitioning** and **Clustering** across all high-volume mart tables.
+
+### Partitioning & Clustering
+
+| Table | Partitioned By | Clustered By |
+| :--- | :--- | :--- |
+| `fct_transactions` | `transaction_date` (day) | `department_name`, `household_id` |
+| `fct_coupon_redemptions` | `redemption_date` (day) | `campaign_id` |
+| `fct_customer_metrics` | — | `household_id` |
+| `dim_household` | — | `income_range` |
+
+### Dynamic Date Normalization
+
+The raw dataset uses relative integer days (Day 1, Day 2, ...) rather than real calendar dates. All dbt models convert these into standard `DATE` types using `date_add` from a `2022-01-01` baseline, making them fully compatible with BI tools.
+
 ## 📈 Dashboard & Insights
 
 The final layer of the pipeline is a Looker Studio dashboard connected directly to the BigQuery marts dataset.  
