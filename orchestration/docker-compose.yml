@@ -29,8 +29,15 @@ services:
       - kestra_data:/app/storage
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/kestra-wd:/tmp/kestra-wd
+      - ./flows:/app/flows
     environment:
       KESTRA_CONFIGURATION: |
+        micronaut:
+          io:
+            watch:
+              enabled: true
+              paths:
+                - /app/flows
         datasources:
           postgres:
             url: jdbc:postgresql://kestra_postgres:5432/kestra
@@ -38,6 +45,8 @@ services:
             username: kestra
             password: k3str4
         kestra:
+          tutorial-flows:
+            enabled: false
           server:
             basicAuth:
               username: "${KESTRA_ADMIN_USER}"

@@ -1,0 +1,65 @@
+id: master_pipeline_orchestrator
+namespace: zoomcamp
+description: Orquestador central del pipeline Dunnhumby Retail. Ejecuta la ingesta, procesamiento en Spark y modelado en dbt.
+
+triggers:
+  - id: daily_pipeline_schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 5 * * *"
+    disabled: false
+
+tasks:
+  - id: 01_setup_variables
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: zoomcamp
+    flowId: gcp_kv
+    wait: true
+    transmitFailed: true
+
+  - id: 02_ingest_raw_data
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: zoomcamp
+    flowId: ingest_dunnhumby_retail
+    wait: true
+    transmitFailed: true
+    retry:
+      type: constant
+      interval: PT2M
+      maxAttempt: 3
+
+  - id: 03_process_silver_spark
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: zoomcamp
+    flowId: spark_test
+    wait: true
+    transmitFailed: true
+    retry:
+      type: constant
+      interval: PT5M
+      maxAttempt: 2
+
+  - id: 04_bridge_to_bigquery
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: zoomcamp
+    flowId: silver_to_bq
+    wait: true
+    transmitFailed: true
+
+  - id: 05_build_dbt_models
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: zoomcamp
+    flowId: dbt_bq
+    wait: true
+    transmitFailed: true
+    retry:
+      type: constant
+      interval: PT1M
+      maxAttempt: 2
+
+errors:
+  - id: alert_on_failure
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    commands:
+      - echo "Pipeline failed at the exec {{ execution.id }}."
