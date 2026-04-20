@@ -1,10 +1,11 @@
 id: dbt_bq
 namespace: zoomcamp
-description: Flujo principal para clonar el repositorio y construir el Data Warehouse con dbt en BigQuery.
+description: Main workflow to clone the repository and build the data warehouse with dbt in BigQuery.
 
 tasks:
   - id: execute_dbt_models
     type: io.kestra.plugin.scripts.shell.Commands
+
     taskRunner:
       type: io.kestra.plugin.scripts.runner.docker.Docker
     containerImage: ghcr.io/dbt-labs/dbt-bigquery:1.9.0
@@ -14,14 +15,14 @@ tasks:
 
     commands:
       - |
-        # 1. Clonar en una carpeta "repo" para no chocar con gcp-key.json
+        echo "--- Cloning repository ---"
+        rm -rf repo
         git clone https://github.com/picantitoDev/COVID-Mobility-Patterns.git repo
 
-        # 2. Entrar a la carpeta del proyecto
         cd repo/dbt/zoomcamp
 
-        # 3. Crear el profile (Kestra inyectará la ruta absoluta correcta en keyfile)
         mkdir -p ~/.dbt
+        
         cat <<EOF > ~/.dbt/profiles.yml
         zoomcamp:
           outputs:
@@ -37,12 +38,11 @@ tasks:
           target: dev
         EOF
 
-        # 4. Ejecutar los comandos de dbt
-        echo "🟢 --- INSTALANDO DEPENDENCIAS ---"
+        echo "--- Installing dependencies ---"
         dbt deps
 
-        echo "🟢 --- PROBANDO CONEXIÓN A BIGQUERY ---"
+        echo "--- Testing BigQuery connection ---"
         dbt debug
 
-        echo "🟢 --- CONSTRUYENDO DATA WAREHOUSE ---"
+        echo "--- Building data warehouse ---"
         dbt build

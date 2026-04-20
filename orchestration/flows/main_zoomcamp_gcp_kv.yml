@@ -1,39 +1,40 @@
 id: gcp_kv
 namespace: zoomcamp
+description: Initialize Google Cloud configuration values in Kestra key-value storage using global variables.
 
 tasks:
   - id: gcp_project_id
     type: io.kestra.plugin.core.kv.Set
     key: GCP_PROJECT_ID
     kvType: STRING
-    value: "zoomcamp-486316"
+    value: "{{ envs.gcp_project_id }}"
 
   - id: gcp_location
     type: io.kestra.plugin.core.kv.Set
     key: GCP_LOCATION
     kvType: STRING
-    value: "us-central1"
+    value: "{{ envs.gcp_location }}"
 
   - id: gcp_bucket_name
     type: io.kestra.plugin.core.kv.Set
     key: GCP_BUCKET_NAME
     kvType: STRING
-    value: "dunnhumby-retail-lake-486316"
+    value: "{{ envs.gcp_bucket_name }}"
 
   - id: gcp_dataset_staging
     type: io.kestra.plugin.core.kv.Set
     key: GCP_DATASET_STAGING
     kvType: STRING
-    value: "staging"
+    value: "{{ envs.gcp_dataset_staging }}"
 
   - id: gcp_dataset_intermediate
     type: io.kestra.plugin.core.kv.Set
     key: GCP_DATASET_INTERMEDIATE
     kvType: STRING
-    value: "intermediate"
+    value: "{{ envs.gcp_dataset_intermediate }}"
 
   - id: gcp_dataset_marts
     type: io.kestra.plugin.core.kv.Set
     key: GCP_DATASET_MARTS
     kvType: STRING
-    value: "marts"
+    value: "{{ envs.gcp_dataset_marts }}"

@@ -1,9 +1,7 @@
 id: ingest_dunnhumby_retail
 namespace: zoomcamp
 
-description: |
-  Descarga el dataset Dunnhumby usando el secreto codificado
-  GCP_SERVICE_ACCOUNT generado por el script de bash.
+description: Download the Dunnhumby dataset and upload raw CSV files to GCS
 
 variables:
   bucket: "{{ kv('GCP_BUCKET_NAME') }}"
@@ -26,10 +24,22 @@ tasks:
     outputFiles:
       - "*.csv"
     commands:
-      - apt-get update && apt-get install -y wget unzip
-      - wget -O dunnhumby.zip https://www.kaggle.com/api/v1/datasets/download/frtgnn/dunnhumby-the-complete-journey
-      - unzip dunnhumby.zip
-      - ls -lah
+      - |
+        set -euo pipefail
+
+        echo "--- Installing dependencies ---"
+        apt-get update
+        apt-get install -y wget unzip
+
+        echo "--- Downloading dataset ---"
+        wget -O dunnhumby.zip \
+          https://www.kaggle.com/api/v1/datasets/download/frtgnn/dunnhumby-the-complete-journey
+
+        echo "--- Extracting files ---"
+        unzip dunnhumby.zip
+
+        echo "--- Listing extracted files ---"
+        ls -lah
 
   - id: upload_to_gcs
     type: io.kestra.plugin.core.flow.ForEach
@@ -38,7 +48,7 @@ tasks:
       - id: upload
         type: io.kestra.plugin.gcp.gcs.Upload
         from: "{{ outputs.extract.outputFiles[taskrun.value ~ '.csv'] }}"
-        to: "gs://{{ vars.bucket }}/raw/{{ taskrun.value }}.csv"
+        to: "gs://{{ vars.bucket }}/bronze/{{ taskrun.value }}.csv"
 
 pluginDefaults:
   - type: io.kestra.plugin.gcp

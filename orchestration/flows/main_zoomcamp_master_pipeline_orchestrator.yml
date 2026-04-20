@@ -1,6 +1,6 @@
 id: master_pipeline_orchestrator
 namespace: zoomcamp
-description: Orquestador central del pipeline Dunnhumby Retail. Ejecuta la ingesta, procesamiento en Spark y modelado en dbt.
+description: Central orchestration workflow for the Dunnhumby Retail pipeline. Executes ingestion, Spark processing, external table creation, and dbt transformations.
 
 triggers:
   - id: daily_pipeline_schedule
@@ -9,14 +9,14 @@ triggers:
     disabled: false
 
 tasks:
-  - id: 01_setup_variables
+  - id: bootstrap_runtime_config
     type: io.kestra.plugin.core.flow.Subflow
     namespace: zoomcamp
     flowId: gcp_kv
     wait: true
     transmitFailed: true
 
-  - id: 02_ingest_raw_data
+  - id: ingest_raw_data
     type: io.kestra.plugin.core.flow.Subflow
     namespace: zoomcamp
     flowId: ingest_dunnhumby_retail
@@ -27,7 +27,7 @@ tasks:
       interval: PT2M
       maxAttempt: 3
 
-  - id: 03_process_silver_spark
+  - id: process_silver_layer
     type: io.kestra.plugin.core.flow.Subflow
     namespace: zoomcamp
     flowId: spark_test
@@ -38,14 +38,14 @@ tasks:
       interval: PT5M
       maxAttempt: 2
 
-  - id: 04_bridge_to_bigquery
+  - id: create_bigquery_external_tables
     type: io.kestra.plugin.core.flow.Subflow
     namespace: zoomcamp
     flowId: silver_to_bq
     wait: true
     transmitFailed: true
 
-  - id: 05_build_dbt_models
+  - id: build_dbt_models
     type: io.kestra.plugin.core.flow.Subflow
     namespace: zoomcamp
     flowId: dbt_bq

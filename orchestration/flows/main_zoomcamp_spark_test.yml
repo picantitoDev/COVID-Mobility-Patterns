@@ -1,14 +1,19 @@
 id: spark_test
+
 namespace: zoomcamp
+
+description: Process raw CSV files from Google Cloud Storage with Spark and write cleaned Parquet files to the silver layer.
 
 tasks:
   - id: run_spark_silver
     type: io.kestra.plugin.scripts.python.Script
+
     containerImage: python:3.11-slim
 
     taskRunner:
       type: io.kestra.plugin.scripts.runner.docker.Docker
       user: "root"
+
       memory:
         memory: "8GB"
         memoryReservation: "6GB"
@@ -29,49 +34,95 @@ tasks:
 
     script: |
       import os
+      import sys
+
       from pyspark.sql import SparkSession
-      from pyspark.sql import functions as F
 
       key_path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
-
-      # Configuración de Spark - Alineación corregida
-      spark = SparkSession.builder \
-          .appName('Dunnhumby-Silver-Processing') \
-          .config("spark.jars.packages", "com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.15") \
-          .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem") \
-          .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS") \
-          .config("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
-          .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", key_path) \
-          .config("spark.driver.memory", "6g") \
-          .config("spark.executor.memory", "6g") \
-          .config("spark.sql.shuffle.partitions", "4") \
-          .getOrCreate()
-
-      print(f"--- Spark iniciado con 6GB de RAM ---")
+      bucket = os.environ["GCP_BUCKET"]
 
       tables = [
-          "campaign_desc", "campaign_table", "causal_data",
-          "coupon", "coupon_redempt", "hh_demographic",
-          "product", "transaction_data"
+          "campaign_desc",
+          "campaign_table",
+          "causal_data",
+          "coupon",
+          "coupon_redempt",
+          "hh_demographic",
+          "product",
+          "transaction_data"
       ]
 
-      bucket = os.environ['GCP_BUCKET']
+      spark = (
+          SparkSession.builder
+          .appName("Dunnhumby-Silver-Processing")
+          .config(
+              "spark.jars.packages",
+              "com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.15"
+          )
+          .config(
+              "spark.hadoop.fs.gs.impl",
+              "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem"
+          )
+          .config(
+              "spark.hadoop.fs.AbstractFileSystem.gs.impl",
+              "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS"
+          )
+          .config(
+              "spark.hadoop.google.cloud.auth.service.account.enable",
+              "true"
+          )
+          .config(
+              "spark.hadoop.google.cloud.auth.service.account.json.keyfile",
+              key_path
+          )
+          .config("spark.driver.memory", "6g")
+          .config("spark.executor.memory", "6g")
+          .config("spark.sql.shuffle.partitions", "4")
+          .getOrCreate()
+      )
+
+      print("--- Spark session started ---")
+
+      failed_tables = []
 
       for table in tables:
           try:
-              print(f"--- Procesando tabla: {table} ---")
+              print(f"--- Processing table: {table} ---")
+
               input_path = f"gs://{bucket}/raw/{table}.csv"
               output_path = f"gs://{bucket}/silver/{table}"
 
-              df = spark.read.option("header", "true").option("inferSchema", "true").csv(input_path)
-              df_clean = df.dropna(how='all').dropDuplicates()
-              df_clean.write.mode("overwrite").parquet(output_path)
+              df = (
+                  spark.read
+                  .option("header", "true")
+                  .option("inferSchema", "true")
+                  .csv(input_path)
+              )
 
-              print(f"✅ Tabla {table} completada.")
+              df_clean = (
+                  df.dropna(how="all")
+                    .dropDuplicates()
+              )
+
+              (
+                  df_clean.write
+                  .mode("overwrite")
+                  .parquet(output_path)
+              )
+
+              print(f"Completed table: {table}")
+
               spark.catalog.clearCache()
 
           except Exception as e:
-              print(f"❌ Error en tabla {table}: {str(e)}")
+              print(f"Failed table {table}: {str(e)}")
+              failed_tables.append(table)
 
       spark.stop()
-      print("--- Proceso finalizado exitosamente ---")
+
+      if failed_tables:
+          raise RuntimeError(
+              f"Processing failed for tables: {', '.join(failed_tables)}"
+          )
+
+      print("--- Processing completed successfully ---")
