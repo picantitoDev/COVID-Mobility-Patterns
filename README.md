@@ -239,7 +239,52 @@ docker compose up -d
 
 Once the containers are running:
 
-1. Open your browser and go to the **Kestra UI**: [http://localhost:8080](http://localhost:8080)
-2. Navigate to **Flows** in the left sidebar.
-3. Select the `end_to_end_pipeline` flow.
-4. Click **Execute** and watch the pipeline begin.
+1. Open your browser and go to the **Kestra UI**:  
+   http://localhost:8080  
+
+2. Log in with the email and password you configured earlier.
+
+3. Navigate to **Flows** in the left sidebar.
+
+4. Select the `end_to_end_pipeline` flow.
+
+   ![End to End Pipeline](docs/images/kestra_pipeline.png)
+
+5. Click **Execute** and watch the pipeline start.
+
+   ![Pipeline Completed](docs/images/kestra_flow_vertical.jpeg)
+## 🗄️ Storage and Modeling Results
+By utilizing PySpark for data cleansing, the raw datasets were successfully transformed into partitioned Parquet files within the Data Lake:
+
+ ![GCS Data Lake Bronze/Silver Structure](docs/images/gcs_buckets.png)
+
+Subsequently, dbt was used to orchestrate the modeling process within BigQuery, building out the star schema across staging, intermediate, and analytical (marts) datasets:
+
+![BigQuery dbt Models](docs/images/transformed_datasets.png)
+
+## 📈 Dashboard & Insights
+
+The final layer of the pipeline is a Looker Studio dashboard connected directly to the BigQuery marts dataset.  
+The visual layer was specifically designed to answer the core business questions established at the beginning of the project.
+
+---
+
+### 1. Spending Trends
+
+The dashboard tracks **Total Revenue** and net sales over time, showing a steady growth pattern with significant seasonal peaks.  
+We also identified which product categories (e.g., *Grocery*, *Drug GM*) are driving the most reliable revenue.
+
+![Spending Trends and KPIs](docs/images/dashboard_01.jpeg)
+
+![Top Categories](docs/images/dashboard_02.jpeg)
+
+---
+
+### 2. Demographic Impact & Marketing Effectiveness
+
+By joining customer metrics with household dimensions, we clearly visualize how higher `income_range` correlates with overall spend.  
+Additionally, the data provides strong evidence of the impact of direct mail marketing.
+
+![Demographics and Marketing Impact](docs/images/dashboard_03.jpeg)
+
+![Basket Value by Household Size](docs/images/dashboard_04.jpeg)
