@@ -1,8 +1,14 @@
+/* Standardize household demographic data from the Dunnhumby source. */
+
 with source as (
-    select * from {{ source('dunnhumby', 'hh_demographic') }}
+
+    select *
+    from {{ source('dunnhumby', 'hh_demographic') }}
+
 ),
 
 renamed as (
+
     select
         cast(household_key as int64) as household_id,
         trim(age_desc) as age_range,
@@ -12,7 +18,9 @@ renamed as (
         trim(hh_comp_desc) as household_composition,
         trim(household_size_desc) as household_size_desc,
         trim(kid_category_desc) as kids_category_desc
+
     from source
+
 )
 
 select * from renamed

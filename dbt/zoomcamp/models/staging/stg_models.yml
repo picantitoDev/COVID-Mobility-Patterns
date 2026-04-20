@@ -1,51 +1,65 @@
 version: 2
 
 models:
+
   - name: stg_hh_demographic
-    description: "Información sociodemográfica a nivel de hogar."
+    description: "Household-level demographic information."
+
     columns:
       - name: household_id
-        description: "Identificador único de cada hogar."
+        description: "Unique identifier for each household."
         tests:
           - unique
           - not_null
 
   - name: stg_product
-    description: "Maestro de productos del catálogo."
+    description: "Product master data from the retail catalog."
+
     columns:
       - name: product_id
-        description: "Identificador único de producto."
+        description: "Unique product identifier."
         tests:
           - unique
           - not_null
 
   - name: stg_campaign_desc
-    description: "Maestro de campañas y sus periodos."
+    description: "Campaign master data and campaign time periods."
+
     columns:
       - name: campaign_id
-        description: "Identificador único de la campaña."
+        description: "Unique campaign identifier."
         tests:
           - unique
           - not_null
 
-  - name: stg_transaction_data
-    description: "Detalle transaccional de compras a nivel línea de ticket."
+  - name: stg_campaign_table
+    description: "Household participation in marketing campaigns."
+
     columns:
       - name: household_id
         tests:
           - not_null
-      - name: basket_id
-        tests:
-          - not_null
-      - name: product_id
+
+      - name: campaign_id
         tests:
           - not_null
           - relationships:
+              to: ref('stg_campaign_desc')
+              field: campaign_id
+
+  - name: stg_causal_data
+    description: "Promotional display and mailer activity data."
+
+    columns:
+      - name: product_id
+        tests:
+          - relationships:
               to: ref('stg_product')
               field: product_id
-              
+
   - name: stg_coupon
-    description: "Mapeo de cupones a campañas y productos válidos."
+    description: "Mapping of coupons to valid campaigns and products."
+
     columns:
       - name: campaign_id
         tests:
@@ -53,6 +67,36 @@ models:
           - relationships:
               to: ref('stg_campaign_desc')
               field: campaign_id
+
+      - name: product_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_product')
+              field: product_id
+
+  - name: stg_coupon_redempt
+    description: "Coupon redemption transactions."
+
+    columns:
+      - name: campaign_id
+        tests:
+          - relationships:
+              to: ref('stg_campaign_desc')
+              field: campaign_id
+
+  - name: stg_transaction_data
+    description: "Line-level transactional purchase data."
+
+    columns:
+      - name: household_id
+        tests:
+          - not_null
+
+      - name: basket_id
+        tests:
+          - not_null
+
       - name: product_id
         tests:
           - not_null

@@ -2,67 +2,82 @@ version: 2
 
 models:
   - name: int_transactions_enriched
-    description: "El motor financiero: Transacciones a nivel de línea de ticket, enriquecidas con metadata de producto y descuentos consolidados."
+    description: "Line-level transactions enriched with product attributes and consolidated discount metrics."
+
     columns:
       - name: basket_id
-        description: "Identificador de la transacción/ticket."
+        description: "Transaction or basket identifier."
         tests:
           - not_null
+
       - name: product_id
         tests:
           - not_null
+
       - name: total_discount_amount
-        description: "Suma absoluta de los descuentos aplicados (retailer, fabricante y lealtad)."
+        description: "Total discount amount calculated from retailer, manufacturer, and loyalty discounts."
 
   - name: int_promotions_enriched
-    description: "El motor de punto de venta: Transacciones cruzadas con datos causales para identificar si la venta fue impulsada por exhibiciones o folletos."
+    description: "Transactions enriched with promotional causal data from in-store displays and mailers."
+
     columns:
       - name: is_on_display
-        description: "Booleano (True/False): Indica si el producto estaba exhibido en un lugar especial de la tienda durante esa semana."
+        description: "Boolean flag indicating whether the product was on display during the transaction week."
+
       - name: is_in_mailer
-        description: "Booleano (True/False): Indica si el producto estaba anunciado en el folleto promocional esa semana."
+        description: "Boolean flag indicating whether the product appeared in a promotional mailer during the transaction week."
 
   - name: int_campaign_redemptions_joined
-    description: "El motor de conversión: Historial de redención de cupones cruzado con la metadata de la campaña para validar fechas."
+    description: "Coupon redemption events joined with campaign metadata and redemption timing validation."
+
     columns:
       - name: is_redeemed_in_window
-        description: "Booleano (True/False): Valida si la redención del cupón ocurrió durante las fechas oficiales de inicio y fin de la campaña."
+        description: "Boolean flag indicating whether coupon redemption occurred within the campaign date range."
 
   - name: int_customer_behavior_aggregated
-    description: "El motor de lealtad: Métricas de comportamiento de compra pre-agregadas por hogar, enriquecidas con datos sociodemográficos."
+    description: "Household-level aggregated purchase behavior enriched with demographic attributes."
+
     columns:
       - name: household_id
-        description: "Identificador único de la familia/hogar."
+        description: "Unique household identifier."
         tests:
           - unique
           - not_null
+
       - name: avg_basket_value
-        description: "Ticket promedio calculado (Total gastado / Número de transacciones)."
+        description: "Average basket value calculated as total spend divided by number of baskets."
+
       - name: total_items_bought
-        description: "Volumen total de artículos comprados a lo largo de toda la historia del cliente."
+        description: "Total quantity of items purchased by the household."
 
   - name: int_household_campaign_exposure
-    description: "El motor de alcance: Mapeo de hogares (y su demografía) con las campañas de marketing que recibieron y sus fechas de vigencia."
+    description: "Household campaign exposure data enriched with demographic and campaign attributes."
+
     columns:
       - name: household_id
         tests:
           - not_null
+
       - name: campaign_id
         tests:
           - not_null
+
       - name: campaign_type
-        description: "Tipo de campaña asignada (TypeA, TypeB, TypeC)."
+        description: "Assigned campaign type."
 
   - name: int_product_coupon_eligibility
-    description: "El motor de catálogo: Maestro de elegibilidad que cruza cupones, productos válidos y campañas."
+    description: "Coupon eligibility mapping across products and campaigns."
+
     columns:
       - name: coupon_upc
-        description: "Identificador universal del código de barras del cupón."
+        description: "Universal product code for the coupon."
         tests:
           - not_null
+
       - name: product_id
-        description: "Producto en el que se puede aplicar el cupón."
+        description: "Product eligible for coupon redemption."
         tests:
           - not_null
+
       - name: department_name
-        description: "Departamento al que pertenece el producto en promoción (ej. GROCERY, MEAT)."
+        description: "Product department associated with the promotion."

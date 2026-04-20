@@ -1,8 +1,14 @@
+/* Standardize transactional purchase data from the Dunnhumby source. */
+
 with source as (
-    select * from {{ source('dunnhumby', 'transaction_data') }}
+
+    select *
+    from {{ source('dunnhumby', 'transaction_data') }}
+
 ),
 
 renamed as (
+
     select
         cast(household_key as int64) as household_id,
         cast(basket_id as int64) as basket_id,
@@ -16,7 +22,9 @@ renamed as (
         cast(retail_disc as float64) as loyalty_discount_amount,
         cast(trans_time as int64) as transaction_time,
         cast(week_no as int64) as week_number
+
     from source
+
 )
 
 select * from renamed

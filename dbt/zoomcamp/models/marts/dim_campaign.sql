@@ -1,3 +1,5 @@
+/* Create the campaign dimension table. */
+
 {{ config(materialized='table') }}
 
 select distinct
@@ -7,4 +9,5 @@ select distinct
     end_day,
     date_add(date '2022-01-01', interval cast(start_day as int64) - 1 day) as campaign_start_date,
     date_add(date '2022-01-01', interval cast(end_day as int64) - 1 day) as campaign_end_date
+
 from {{ ref('int_household_campaign_exposure') }}

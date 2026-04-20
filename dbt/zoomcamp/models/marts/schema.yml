@@ -1,43 +1,112 @@
 version: 2
 
 models:
+
+  - name: dim_campaign
+    description: "Campaign dimension containing marketing campaign metadata and time range."
+
+    columns:
+      - name: campaign_id
+        description: "Unique campaign identifier."
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_date
+    description: "Date dimension for time-based analytics."
+
+    columns:
+      - name: calendar_date
+        description: "Calendar date."
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_household
+    description: "Household dimension containing demographic attributes."
+
+    columns:
+      - name: household_id
+        description: "Unique household identifier."
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_product
+    description: "Product dimension containing product attributes and hierarchy."
+
+    columns:
+      - name: product_id
+        description: "Unique product identifier."
+        tests:
+          - unique
+          - not_null
+
   - name: fct_transactions
-    description: "Tabla de hechos de ventas. Granularidad: 1 fila por producto dentro de un ticket de compra."
+    description: "Sales fact table enriched with product and promotional attributes. Grain: product per transaction."
+
     columns:
       - name: basket_id
+        description: "Transaction identifier."
         tests:
           - not_null
+
       - name: product_id
+        description: "Product identifier."
         tests:
           - not_null
           - relationships:
               to: ref('dim_product')
               field: product_id
+
       - name: transaction_date
-        description: "Fecha generada dinámicamente para particionamiento en BigQuery."
+        description: "Derived transaction date used for partitioning."
+        tests:
+          - not_null
 
   - name: fct_coupon_redemptions
-    description: "Tabla de hechos de redención de cupones. Granularidad: 1 fila por cupón redimido."
+    description: "Coupon redemption fact table. Grain: one row per redeemed coupon."
+
     columns:
       - name: campaign_id
+        description: "Campaign identifier."
         tests:
           - not_null
           - relationships:
               to: ref('dim_campaign')
               field: campaign_id
 
-  - name: dim_household
-    description: "Dimensión de hogares y perfil demográfico."
+      - name: redemption_date
+        description: "Date when coupon was redeemed."
+        tests:
+          - not_null
+
+      - name: redemption_count
+        description: "Constant metric for aggregation."
+        tests:
+          - not_null
+
+  - name: fct_customer_metrics
+    description: "Aggregated customer-level behavioral metrics."
+
     columns:
       - name: household_id
+        description: "Household identifier."
         tests:
           - unique
           - not_null
 
-  - name: dim_date
-    description: "Dimensión calendario para habilitar BI temporal."
-    columns:
-      - name: calendar_date
-        tests:
-          - unique
-          - not_null
+      - name: total_baskets
+        description: "Total number of baskets per household."
+
+      - name: total_spend
+        description: "Total spend per household."
+
+      - name: total_items_bought
+        description: "Total items purchased per household."
+
+      - name: total_discount_saved
+        description: "Total discount amount saved per household."
+
+      - name: avg_basket_value
+        description: "Average basket value per household."

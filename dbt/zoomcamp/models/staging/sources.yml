@@ -3,10 +3,10 @@ version: 2
 sources:
   - name: dunnhumby
     schema: staging
-    description: "Dataset The Complete Journey de dunnhumby"
+    description: "Dunnhumby - The Complete Journey"
     tables:
       - name: campaign_table
-        identifier: ext_campaign_table # <--- Conectando con tu tabla externa real
+        identifier: ext_campaign_table
       - name: hh_demographic
         identifier: ext_hh_demographic
       - name: transaction_data

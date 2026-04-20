@@ -1,3 +1,5 @@
+/* Create the household dimension table. */
+
 {{ config(
     materialized='table',
     cluster_by=['income_range']
@@ -9,4 +11,5 @@ select
     marital_status_code,
     income_range,
     household_size_desc
+
 from {{ ref('int_customer_behavior_aggregated') }}
